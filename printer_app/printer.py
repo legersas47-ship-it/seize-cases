@@ -125,6 +125,35 @@ def print_calibration(printer: str) -> None:
         dc.DeleteDC()
 
 
+def print_ink_test(printer: str) -> None:
+    """Pleine page : gros aplats de chaque encre pure + leurs noms, en qualite normale.
+    Ce qui ne sort pas = encre vide/bouchee."""
+    from PIL import ImageDraw, ImageFont
+    dc = _open_dc(printer, False, False)
+    try:
+        w, h = dc.GetDeviceCaps(win32con.HORZRES), dc.GetDeviceCaps(win32con.VERTRES)
+        img = Image.new("RGB", (w // 4, h // 4), "white")
+        d = ImageDraw.Draw(img)
+        try:
+            font = ImageFont.truetype("arialbd.ttf", img.width // 14)
+        except OSError:
+            font = ImageFont.load_default()
+        blocks = [("CYAN", (0, 255, 255)), ("MAGENTA", (255, 0, 255)), ("JAUNE", (255, 255, 0)),
+                  ("NOIR", (0, 0, 0)), ("ROUGE M+J", (255, 0, 0)), ("BLEU C+M", (0, 0, 255))]
+        bw, bh = img.width // 2, img.height // 3
+        for i, (name, col) in enumerate(blocks):
+            x, y = (i % 2) * bw, (i // 2) * bh
+            d.rectangle((x + 10, y + 10, x + bw - 10, y + bh - 70), fill=col)
+            d.text((x + 14, y + bh - 64), name, fill=col if name != "JAUNE" else (255, 200, 0), font=font)
+        dc.StartDoc("Test des encres")
+        dc.StartPage()
+        ImageWin.Dib(img).draw(dc.GetHandleOutput(), (0, 0, w, h))
+        dc.EndPage()
+        dc.EndDoc()
+    finally:
+        dc.DeleteDC()
+
+
 def printer_status(printer: str) -> dict:
     """Etat du spouleur (file d'attente, erreurs papier, etc.)."""
     h = win32print.OpenPrinter(printer)

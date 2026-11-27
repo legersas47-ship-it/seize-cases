@@ -101,7 +101,19 @@ def _halftone(cov: np.ndarray, pitch: float, angle: float, max_r: float = 0.72) 
 
 
 def _compose(masks: dict[str, np.ndarray], shape: tuple[int, int]) -> Image.Image:
-    """Superpose les masques d'encre (multiply) -> image RGB."""
+    """Superpose les masques d'encre (multiply) -> image RGB.
+
+    Sans noir disponible : composition EXCLUSIVE, chaque pixel recoit au plus une
+    encre pure (C, M ou J). Le pilote n'a alors jamais de raison d'utiliser le noir."""
+    if "K" not in masks and len(masks) > 1:
+        names = list(masks)
+        stack = np.stack([masks[n] for n in names])  # (n, h, w)
+        win = stack.argmax(0)
+        on = stack.max(0) > 0.5
+        out = np.full((shape[0], shape[1], 3), 255, dtype=np.uint8)
+        for i, n in enumerate(names):
+            out[on & (win == i)] = INK_RGB[n]
+        return Image.fromarray(out, "RGB")
     out = np.ones((shape[0], shape[1], 3), dtype=np.float32)
     for ch, mk in masks.items():
         col = np.array(INK_RGB[ch], dtype=np.float32) / 255.0
@@ -113,7 +125,9 @@ def _edges(img: Image.Image, thresh: int = 40, thick: int = 3) -> np.ndarray:
     g = ImageOps.grayscale(img).filter(ImageFilter.GaussianBlur(1.6))
     e = g.filter(ImageFilter.FIND_EDGES)
     e = ImageOps.autocontrast(e)
-    e = e.point(lambda p: 255 if p > thresh else 0)
+    # seuil adaptatif : au moins ~10 % des pixels deviennent des traits, meme sur une photo douce
+    t = min(thresh, float(np.percentile(np.asarray(e), 90)))
+    e = e.point(lambda p: 255 if p > t else 0)
     if thick > 1:
         e = e.filter(ImageFilter.MaxFilter(thick if thick % 2 else thick + 1))
     a = np.asarray(e, dtype=np.float32) / 255.0
@@ -123,7 +137,7 @@ def _edges(img: Image.Image, thresh: int = 40, thick: int = 3) -> np.ndarray:
 
 
 def _darkest_ink(inks: str) -> str:
-    for ch in "KCMY":
+    for ch in "KMCY":
         if ch in inks:
             return ch
     return "K"

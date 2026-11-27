@@ -1,7 +1,8 @@
 {
   "printer": "HP DeskJet 3700 series",
-  "inks": "CMYK",
+  "inks": "CMY",
   "eco": true,
+  "draft": false,
   "default_effect": "comics",
   "allow_visitor_effect": true,
   "auto_print": true,

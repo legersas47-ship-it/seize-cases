@@ -73,7 +73,7 @@ def process(meta_path: Path):
         out, used = effects.render(ph, size, effect, CFG.get("inks", "CMYK"), CFG.get("eco", True), CFG.get("dpi", 300))
     mono = CFG.get("inks", "CMYK").upper() == "K"
     printer.print_in_cell(CFG["printer"], out, cell, f"photo-comics f{sheet} c{cell + 1}", mono=mono,
-                          draft=CFG.get("eco", True))
+                          draft=CFG.get("draft", False))
     stem = f"f{sheet:03d}-c{cell + 1:02d}-{meta_path.stem}"
     out.save(DATA / "archive" / f"{stem}-rendu.png")
     photo_path.replace(DATA / "archive" / f"{stem}-original.jpg")
@@ -208,12 +208,14 @@ form{display:inline}</style>
 <form method=post action=/toggle><button>{{'Reprendre' if s.paused else 'Pause'}}</button></form>
 <form method=post action=/newsheet><button>Nouvelle feuille (case 1)</button></form>
 <form method=post action=/calibrate><button>Imprimer la grille de calibration</button></form>
+<form method=post action=/inktest><button>Page de test des encres</button></form>
 <p>Imprimante : {{', '.join(ps.status)}} · taches dans le spouleur : {{ps.spool_jobs}} · file : {{q}} · imprimees : {{s.printed_total}}</p>
 </fieldset>
 <fieldset><legend>Reglages</legend><form method=post action=/settings>
 Encres disponibles : {% for ch,nm in [('C','cyan'),('M','magenta'),('Y','jaune'),('K','noir')] %}
 <label><input type=checkbox name=ink value={{ch}} {{'checked' if ch in c.inks}}> {{nm}}</label>{% endfor %}<br>
-<label><input type=checkbox name=eco {{'checked' if c.eco}}> mode eco (moins d'encre + qualite brouillon)</label><br>
+<label><input type=checkbox name=eco {{'checked' if c.eco}}> mode eco (moins de points)</label><br>
+<label><input type=checkbox name=draft {{'checked' if c.draft}}> qualite brouillon (attention : quasi invisible si l'encre est basse)</label><br>
 <label><input type=checkbox name=auto_print {{'checked' if c.auto_print}}> impression automatique (sinon : validation ici)</label><br>
 <label><input type=checkbox name=allow_visitor_effect {{'checked' if c.allow_visitor_effect}}> les visiteurs choisissent l'effet</label><br>
 Effet par defaut : <select name=default_effect>{% for k,v in fx.items() %}<option value={{k}} {{'selected' if k==c.default_effect}}>{{k}} — {{v}}</option>{% endfor %}</select>
@@ -276,12 +278,19 @@ def a_calibrate():
     return redirect("/")
 
 
+@admin.post("/inktest")
+def a_inktest():
+    threading.Thread(target=printer.print_ink_test, args=(CFG["printer"],), daemon=True).start()
+    return redirect("/")
+
+
 @admin.post("/settings")
 def a_settings():
     f = request.form
     with lock:
         CFG["inks"] = "".join(f.getlist("ink")) or "K"
         CFG["eco"] = "eco" in f
+        CFG["draft"] = "draft" in f
         CFG["auto_print"] = "auto_print" in f
         CFG["allow_visitor_effect"] = "allow_visitor_effect" in f
         if f.get("default_effect") in effects.EFFECTS:
