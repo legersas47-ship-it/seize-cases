@@ -1,0 +1,14 @@
+{
+  "printer": "HP DeskJet 3700 series",
+  "inks": "CMYK",
+  "eco": true,
+  "default_effect": "comics",
+  "allow_visitor_effect": true,
+  "auto_print": true,
+  "dpi": 300,
+  "public_port": 8765,
+  "admin_port": 8766,
+  "min_seconds_between_uploads_per_visitor": 30,
+  "max_queue": 40,
+  "max_upload_mb": 15
+}
